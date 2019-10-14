@@ -135,10 +135,10 @@ func (rf *Raft) readPersist(data []byte) {
 //
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
-	Term        int
-	CandidateID int
-	// LastLogIndex int
-	// LastLogTerm  int
+	Term         int
+	CandidateID  int
+	LastLogIndex int
+	LastLogTerm  int
 }
 
 //
@@ -225,12 +225,12 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 
 // structure for AppendEntries RPC arguments
 type AppendEntriesArgs struct {
-	Term     int
-	LeaderID int
-	// PrevLogIndex int
-	// PrevLogTerm  int
-	// Entries      []LogEntry
-	// LeaderCommit int
+	Term         int
+	LeaderID     int
+	PrevLogIndex int
+	PrevLogTerm  int
+	Entries      []LogEntry
+	LeaderCommit int
 }
 
 // structure for AppendEntries RPC reply
@@ -402,7 +402,9 @@ func (rf *Raft) startElection() {
 	rf.totalVote = 1
 	rf.votedFor = rf.me
 	rf.currentTerm += 1
-	args := RequestVoteArgs{rf.currentTerm, rf.me}
+	LastLogTerm := rf.log[len(rf.log)-1].Term
+	LastLogIndex := len(rf.log) - 1
+	args := RequestVoteArgs{rf.currentTerm, rf.me, LastLogIndex, LastLogTerm}
 	for i := range rf.peers {
 		if i != rf.me {
 			server := i
@@ -422,7 +424,7 @@ func (rf *Raft) startElection() {
 }
 
 func (rf *Raft) startHeartbeat() {
-	args := AppendEntriesArgs{rf.currentTerm, rf.me}
+	args := AppendEntriesArgs{rf.currentTerm, rf.me, 0, 0, nil, rf.commitIndex}
 	for i := range rf.peers {
 		if i != rf.me {
 			server := i
