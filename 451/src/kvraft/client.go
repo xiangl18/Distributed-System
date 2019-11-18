@@ -1,12 +1,16 @@
 package raftkv
 
-import "labrpc"
-import "crypto/rand"
-import "math/big"
-
+import (
+	"crypto/rand"
+	"labrpc"
+	"math/big"
+)
 
 type Clerk struct {
-	servers []*labrpc.ClientEnd
+	servers    []*labrpc.ClientEnd
+	lastLeader int
+	OpID       int
+	ClientID   int64
 	// You will have to modify this struct.
 }
 
@@ -20,6 +24,9 @@ func nrand() int64 {
 func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
+	ck.lastLeader = 0
+	ck.OpID = 0
+	ck.ClientID = nrand()
 	// You'll have to add code here.
 	return ck
 }
@@ -36,10 +43,28 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 // must match the declared types of the RPC handler function's
 // arguments. and reply must be passed as a pointer.
 //
-func (ck *Clerk) Get(key string) string {
 
+func (ck *Clerk) Get(key string) string {
 	// You will have to modify this function.
-	return ""
+	args := GetArgs{
+		Key: key, 
+		ClientID: ck.ClientID, 
+		OpID: ck.OpID,
+	}
+	ck.OpID++
+	reply := GetReply{}
+	leaderID := ck.lastLeader
+	ok := ck.servers[leaderID].Call("RaftKV.Get", &args, &reply)
+	DPrintf("Client GET (%v, %d) operation, result is %v, %v", args.ClientID, args.OpID, ok, reply.WrongLeader)
+	for !ok || reply.WrongLeader {
+		leaderID = (leaderID + 1) % len(ck.servers)
+		reply = GetReply{}
+		ok = ck.servers[leaderID].Call("RaftKV.Get", &args, &reply)
+		DPrintf("Client GET (%v, %d) operation, result is %v, %v", args.ClientID, args.OpID, ok, reply.WrongLeader)
+	}
+	ck.lastLeader = leaderID
+	DPrintf("Client GET operation (%v, %d) completed", args.ClientID, args.OpID)
+	return reply.Value
 }
 
 //
@@ -54,6 +79,20 @@ func (ck *Clerk) Get(key string) string {
 //
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	// You will have to modify this function.
+	args := PutAppendArgs{Key: key, Value: value, Op: op, ClientID: ck.ClientID, OpID: ck.OpID}
+	ck.OpID++
+	leaderID := ck.lastLeader
+	reply := PutAppendReply{}
+	ok := ck.servers[leaderID].Call("RaftKV.PutAppend", &args, &reply)
+	DPrintf("Client %v operation (%v, %d), result is %v, %v", op, args.ClientID, args.OpID, ok, reply.WrongLeader)
+	for !ok || reply.WrongLeader {
+		leaderID = (leaderID + 1) % len(ck.servers)
+		reply = PutAppendReply{}
+		ok = ck.servers[leaderID].Call("RaftKV.PutAppend", &args, &reply)
+		DPrintf("Client %v operation (%v, %d), result is %v, %v", op, args.ClientID, args.OpID, ok, reply.WrongLeader)
+	}
+	DPrintf("Client %v operation (%v %d) completed", op, args.ClientID, args.OpID)
+	ck.lastLeader = leaderID
 }
 
 func (ck *Clerk) Put(key string, value string) {
