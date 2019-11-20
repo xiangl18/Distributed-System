@@ -592,7 +592,6 @@ func Make(peers []*labrpc.ClientEnd, me int,
 			}
 		}
 	}()
-
 	go func() {
 		for {
 			select {
@@ -673,7 +672,9 @@ func (rf *Raft) startHeartbeat() {
 	N := rf.commitIndex
 	last := rf.getLastLogIndex()
 	offset := rf.log[0].Index
-//  If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)	
+	// If there exists an N such that N > commitIndex, a majority
+	// of matchIndex[i] ≥ N, and log[N].term == currentTerm:
+	// set commitIndex = N
 	for i := rf.commitIndex + 1; i <= last; i++ {
 		num := 1
 		for j := range rf.peers {
@@ -704,9 +705,9 @@ func (rf *Raft) startHeartbeat() {
 					prevLogTerm,
 					entries,
 					rf.commitIndex}
-				go func(i int, args AppendEntriesArgs) {
+				go func(server int, args AppendEntriesArgs) {
 					var reply AppendEntriesReply
-					rf.sendAppendEntries(i, &args, &reply)
+					rf.sendAppendEntries(server, &args, &reply)
 				}(i, args)
 			} else {
 				lastIncludedIndex := rf.log[0].Index
