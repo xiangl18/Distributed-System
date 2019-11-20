@@ -136,15 +136,15 @@ func (kv *RaftKV) UpdateStorage() {
 			kv.result[a.Index] = make(chan Result, 1)
 		}
 
-		// if kv.maxraftstate != -1 && kv.maxraftstate < kv.rf.GetPersistSize() {
-		// 	buf := new(bytes.Buffer)
-		// 	encoder := gob.NewEncoder(buf)
-		// 	encoder.Encode(kv.kvStorage)
-		// 	//encoder.Encode(kv.getOpIdStorage)
-		// 	//encoder.Encode(kv.putAppendOpIdStorage)
-		// 	encoder.Encode(kv.historyRecord)
-		// 	go kv.rf.TakeSnapshot(buf.Bytes(), a.Index)
-		// }
+		if kv.maxraftstate != -1 && kv.maxraftstate < kv.rf.GetPersistSize() {
+			buf := new(bytes.Buffer)
+			encoder := gob.NewEncoder(buf)
+			encoder.Encode(kv.kvStorage)
+			//encoder.Encode(kv.getOpIdStorage)
+			//encoder.Encode(kv.putAppendOpIdStorage)
+			encoder.Encode(kv.historyRecord)
+			go kv.rf.StartSnapshot(buf.Bytes(), a.Index)
+		}
 		DPrintf("unlock")
 		kv.mu.Unlock()
 	}
